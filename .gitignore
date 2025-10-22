@@ -1,0 +1,46 @@
+# 🧩 Environment variables
+.env
+
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+
+# 🧱 Virtual environments
+venv/
+env/
+.venv/
+
+# 📦 Dependency & build files
+*.egg-info/
+dist/
+build/
+
+# ⚙️ IDE / Editor settings
+.vscode/
+.idea/
+*.swp
+
+# 🪣 OS files
+.DS_Store
+Thumbs.db
+
+# 🧰 Logs & cache
+*.log
+*.bak
+*.tmp
+.cache/
+.pytest_cache/
+
+# 🚀 Render / deployment-specific (optional)
+render.yaml
+# --- Model files ---
+*.pt
+*.pth
+*.h5
+*.ckpt
+*.safetensors
+*.bin
+*.onnx
