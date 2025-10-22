@@ -9,7 +9,7 @@ app = FastAPI(title="Phishing Detection API")
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://phishing-detector-frontend-eight.vercel.app"] # #Allow all origins for now
+    allow_origins=["https://phishing-detector-frontend-eight.vercel.app"],  # Allow all origins for now
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
