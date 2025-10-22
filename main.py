@@ -1,4 +1,3 @@
-# backend/main.py - Deployment Version
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -7,28 +6,33 @@ import os
 
 app = FastAPI(title="Phishing Detection API")
 
-# CORS - Update with your Vercel URL after deployment
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://phishing-detector-frontend-eight.vercel.app"],  # Update to ["https://your-app.vercel.app"] in production
+    allow_origins=["*"],  # Allow all origins for now
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Configuration
-HF_TOKEN = os.getenv("HF_TOKEN")  # Set in Render dashboard
+HF_TOKEN = os.getenv("HF_TOKEN")
 HF_MODEL_ID = os.getenv("HF_MODEL_ID", "swathi6016/phishing-detector1")
 HF_API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL_ID}"
 
+# Pydantic model for request validation
+class URLRequest(BaseModel):
+    url: str
+
 @app.get("/")
 async def root():
-    """Root endpoint - API information"""
+    """Root endpoint"""
     return {
         "message": "Phishing Detection API",
         "status": "running",
         "model": "DistilBERT via HuggingFace",
         "endpoints": {
-            "check_url": "POST /check",
+            "check": "POST /check",
             "health": "GET /health",
             "docs": "GET /docs"
         }
@@ -36,24 +40,24 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Health check endpoint"""
+    """Health check"""
     return {
         "status": "healthy",
         "model": HF_MODEL_ID,
-        "using": "HuggingFace Inference API"
+        "hf_token_set": bool(HF_TOKEN)
     }
 
 @app.post("/check")
-async def check_url(request: dict):
-    """Check if a URL is phishing or legitimate"""
+async def check_url(request: URLRequest):
+    """Check if URL is phishing"""
     
     if not HF_TOKEN:
         raise HTTPException(
             status_code=500,
-            detail="HF_TOKEN not configured. Please set environment variable."
+            detail="HF_TOKEN not configured"
         )
     
-    url = request.get("url", "")
+    url = request.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
     
@@ -64,14 +68,11 @@ async def check_url(request: dict):
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(HF_API_URL, headers=headers, json=payload)
             
-            # Handle model loading (503)
             if response.status_code == 503:
-                error_data = response.json()
-                if "loading" in str(error_data).lower():
-                    raise HTTPException(
-                        status_code=503,
-                        detail="Model is loading. Please try again in 20 seconds."
-                    )
+                raise HTTPException(
+                    status_code=503,
+                    detail="Model is loading. Please try again in 20 seconds."
+                )
             
             if response.status_code != 200:
                 raise HTTPException(
@@ -81,29 +82,25 @@ async def check_url(request: dict):
             
             result = response.json()
             
-            # Parse HF response - handle different formats
+            # Parse response
             if isinstance(result, list) and len(result) > 0:
-                # Format: [[{"label": "LABEL_0", "score": 0.95}, ...]]
                 predictions = result[0] if isinstance(result[0], list) else result
                 
-                # Find phishing and legitimate scores
                 phishing_score = 0.0
                 legitimate_score = 0.0
                 
                 for pred in predictions:
-                    label = pred.get("label", "").lower()
-                    score = pred.get("score", 0.0)
+                    label = str(pred.get("label", "")).lower()
+                    score = float(pred.get("score", 0.0))
                     
                     if "1" in label or "phishing" in label:
                         phishing_score = score
-                    elif "0" in label or "legitimate" in label:
+                    elif "0" in label or "legitimate" in label or "legit" in label:
                         legitimate_score = score
                 
-                # Determine prediction
                 is_phishing = phishing_score > legitimate_score
                 confidence = max(phishing_score, legitimate_score)
                 
-                # Calculate risk level
                 if phishing_score > 0.8:
                     risk_level = "HIGH RISK"
                 elif phishing_score > 0.5:
@@ -127,24 +124,15 @@ async def check_url(request: dict):
                 )
     
     except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=504,
-            detail="Request timeout. Please try again."
-        )
+        raise HTTPException(status_code=504, detail="Request timeout")
     except httpx.RequestError as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Connection error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Connection error: {str(e)}")
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 if __name__ == "__main__":
-    import uvicorn, os
+    import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
