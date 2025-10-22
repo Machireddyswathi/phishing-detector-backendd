@@ -10,7 +10,7 @@ app = FastAPI(title="Phishing Detection API")
 # CORS - Update with your Vercel URL after deployment
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Update to ["https://your-app.vercel.app"] in production
+    allow_origins=["https://phishing-detector-frontend-eight.vercel.app"],  # Update to ["https://your-app.vercel.app"] in production
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -145,5 +145,6 @@ async def check_url(request: dict):
         )
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import uvicorn, os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
